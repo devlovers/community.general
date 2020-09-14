@@ -169,6 +169,7 @@ notes:
   C(present) and I(grant_option) to C(no) (see examples).
 - Note that when revoking privileges from a role R, this role  may still have
   access via privileges granted to any role R is a member of including C(PUBLIC).
+- Note that when you use C(PUBLIC) role, the module always reports that the state has been changed.
 - Note that when revoking privileges from a role R, you do so as the user
   specified via I(login). If R has been granted the same privileges by
   another user also, R can still access database objects via these privileges.
@@ -783,6 +784,9 @@ class Connection(object):
 
         executed_queries.append(query)
         self.cursor.execute(query)
+        if roles == 'PUBLIC':
+            return True
+
         status_after = get_status(objs)
 
         def nonesorted(e):
@@ -864,12 +868,14 @@ class QueryBuilder(object):
                 self.query[-1] += ' WITH ADMIN OPTION;'
             else:
                 self.query[-1] += ' WITH GRANT OPTION;'
-        else:
+        elif self._grant_option is False:
             self.query[-1] += ';'
             if self._obj_type == 'group':
                 self.query.append('REVOKE ADMIN OPTION FOR {0} FROM {1};'.format(self._set_what, self._for_whom))
             elif not self._obj_type == 'default_privs':
                 self.query.append('REVOKE GRANT OPTION FOR {0} FROM {1};'.format(self._set_what, self._for_whom))
+        else:
+            self.query[-1] += ';'
 
     def add_default_priv(self):
         for obj in self._objs:
@@ -1051,7 +1057,7 @@ def main():
                 objs = [obj.replace(':', ',') for obj in objs]
 
         # roles
-        if p.roles == 'PUBLIC':
+        if p.roles.upper() == 'PUBLIC':
             roles = 'PUBLIC'
         else:
             roles = p.roles.split(',')
